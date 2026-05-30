@@ -59,7 +59,9 @@ export async function GET(req: NextRequest) {
       select: { episodeTitle: true, showTitle: true, season: true, episode: true, tmdbShowId: true, watchedAt: true, rating: true, runtime: true },
     })
     const shows = await db.tVShow.findMany({ where: { userId }, select: { tmdbId: true, poster: true, genres: true } })
-    const showMap = new Map(shows.map((s: { tmdbId: string | null; poster: string | null; genres: string[] }) => [s.tmdbId, { poster: s.poster, genres: s.genres }]))
+    const showMap = new Map<string | null, { poster: string | null; genres: string[] }>(
+      shows.map((s) => [s.tmdbId, { poster: s.poster, genres: s.genres }])
+    )
 
     for (const ep of episodes) {
       const showData = showMap.get(ep.tmdbShowId ?? "")
