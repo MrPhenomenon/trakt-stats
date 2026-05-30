@@ -11,6 +11,12 @@ import { GenresBar } from "@/components/charts/genres-bar"
 import { ReleasedYearBar } from "@/components/charts/released-year-bar"
 import { RatingsChart } from "@/components/charts/ratings-chart"
 
+type MovieRow = {
+  title: string; plays: number; watchedAt: string[]
+  runtime: number | null; genres: string[]; countries: string[]
+  releasedYear: number | null; rating: number | null; poster: string | null
+}
+
 export default async function MoviesPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/")
@@ -24,7 +30,7 @@ export default async function MoviesPage() {
       runtime: true, genres: true, countries: true,
       releasedYear: true, rating: true, poster: true,
     },
-  })
+  }) as MovieRow[]
 
   const allWatchedAt = movies.flatMap((m) => m.watchedAt)
   const totalPlays = movies.reduce((s, m) => s + m.plays, 0)

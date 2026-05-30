@@ -7,6 +7,12 @@ import {
   ratingDistribution, perYearAverage,
 } from "@/lib/stats"
 
+type MovieRow = {
+  traktId: string; title: string; plays: number; watchedAt: string[]
+  runtime: number | null; genres: string[]; countries: string[]
+  releasedYear: number | null; rating: number | null; poster: string | null; tmdbId: string | null
+}
+
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -20,7 +26,7 @@ export async function GET() {
       runtime: true, genres: true, countries: true, releasedYear: true,
       rating: true, poster: true, tmdbId: true,
     },
-  })
+  }) as MovieRow[]
 
   const allWatchedAt = movies.flatMap((m) => m.watchedAt)
   const totalPlays = movies.reduce((s, m) => s + m.plays, 0)

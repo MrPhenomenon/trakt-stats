@@ -11,6 +11,12 @@ import { GenresBar } from "@/components/charts/genres-bar"
 import { ReleasedYearBar } from "@/components/charts/released-year-bar"
 import { RatingsChart } from "@/components/charts/ratings-chart"
 
+type ShowRow = {
+  title: string; episodePlays: number; genres: string[]; countries: string[]
+  releasedYear: number | null; rating: number | null; poster: string | null
+}
+type EpisodeRow = { watchedAt: string[]; runtime: number | null }
+
 export default async function TvPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/")
@@ -21,11 +27,11 @@ export default async function TvPage() {
     db.tVShow.findMany({
       where: { userId },
       select: { title: true, episodePlays: true, genres: true, countries: true, releasedYear: true, rating: true, poster: true },
-    }),
+    }) as Promise<ShowRow[]>,
     db.episode.findMany({
       where: { userId },
       select: { watchedAt: true, runtime: true },
-    }),
+    }) as Promise<EpisodeRow[]>,
   ])
 
   const allWatchedAt = episodes.flatMap((e) => e.watchedAt)

@@ -7,6 +7,13 @@ import {
   ratingDistribution, perYearAverage,
 } from "@/lib/stats"
 
+type ShowRow = {
+  traktId: string; title: string; episodePlays: number
+  genres: string[]; countries: string[]; releasedYear: number | null
+  rating: number | null; poster: string | null
+}
+type EpisodeRow = { watchedAt: string[]; runtime: number | null }
+
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -21,27 +28,23 @@ export async function GET() {
         genres: true, countries: true, releasedYear: true,
         rating: true, poster: true,
       },
-    }),
+    }) as Promise<ShowRow[]>,
     db.episode.findMany({
       where: { userId },
       select: { watchedAt: true, runtime: true },
-    }),
+    }) as Promise<EpisodeRow[]>,
   ])
 
   const allWatchedAt = episodes.flatMap((e) => e.watchedAt)
   const totalEpisodePlays = shows.reduce((s, sh) => s + sh.episodePlays, 0)
-  const totalMinutes = episodes.reduce((s, e) => s + (e.runtime ?? 22), 0) // default 22min
+  const totalMinutes = episodes.reduce((s, e) => s + (e.runtime ?? 22), 0)
   const totalHours = Math.round(totalMinutes / 60)
   const activeYears = Math.max(Object.keys(groupByYear(allWatchedAt)).length, 1)
 
   const top10 = [...shows]
     .sort((a, b) => b.episodePlays - a.episodePlays)
     .slice(0, 10)
-    .map((s) => ({
-      title: s.title,
-      poster: s.poster,
-      plays: s.episodePlays,
-    }))
+    .map((s) => ({ title: s.title, poster: s.poster, plays: s.episodePlays }))
 
   const highestRated = [...shows]
     .filter((s) => s.rating)
