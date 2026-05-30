@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       for (const item of items) if (item.movie) traktMovieIds.add(String(item.movie.ids.trakt))
       p++
     }
-    const dbMovies = await db.movie.findMany({ where: { userId }, select: { id: true, traktId: true, title: true } })
+    const dbMovies = await db.movie.findMany({ where: { userId }, select: { id: true, traktId: true, title: true } }) as { id: string; traktId: string; title: string }[]
     const orphans = dbMovies.filter((m) => !traktMovieIds.has(m.traktId))
     if (orphans.length) {
       await db.movie.deleteMany({ where: { id: { in: orphans.map((m) => m.id) } } })
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
     const dbEpisodes = await db.episode.findMany({
       where: { userId },
       select: { id: true, traktId: true, showTitle: true, season: true, episode: true },
-    })
+    }) as { id: string; traktId: string; showTitle: string; season: number; episode: number }[]
     const orphans = dbEpisodes.filter((e) => !traktEpisodeIds.has(e.traktId))
     if (orphans.length) {
       await db.episode.deleteMany({ where: { id: { in: orphans.map((e) => e.id) } } })
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
   }
 
   const existingMovieIds = new Set(
-    (await db.movie.findMany({ where: { userId }, select: { traktId: true } })).map((m) => m.traktId)
+    (await db.movie.findMany({ where: { userId }, select: { traktId: true } }) as { traktId: string }[]).map((m) => m.traktId)
   )
 
   const newMovies: Record<string, { plays: number; watchedAt: string[]; tmdbId?: number; title: string }> = {}
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
   }
 
   const existingEpisodeIds = new Set(
-    (await db.episode.findMany({ where: { userId }, select: { traktId: true } })).map((e) => e.traktId)
+    (await db.episode.findMany({ where: { userId }, select: { traktId: true } }) as { traktId: string }[]).map((e) => e.traktId)
   )
 
   page = 1

@@ -109,7 +109,7 @@ export function PlaysByTimeCharts({ data, type }: Props) {
             name="Plays"
             radius={[3, 3, 0, 0]}
             cursor="pointer"
-            onClick={(d) => handleBarClick(d.label)}
+            onClick={(d) => handleBarClick((d as unknown as { label: string }).label)}
           >
             {chartData.map((d, i) => (
               <Cell

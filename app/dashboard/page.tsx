@@ -1,11 +1,12 @@
 import { auth } from "@/lib/auth"
+import type { Session } from "next-auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { db } from "@/lib/db"
 import SyncPanel from "./sync-panel"
 
-function ProfileBanner({ session }: { session: Awaited<ReturnType<typeof auth>> }) {
+function ProfileBanner({ session }: { session: Session | null }) {
   if (!session?.user) return null
   const joinedYear = session.user.joinedAt
     ? new Date(session.user.joinedAt).getFullYear()

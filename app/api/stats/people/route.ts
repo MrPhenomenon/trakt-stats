@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       select: { crew: true },
     })
     for (const movie of movies) {
-      const crew = (movie.crew ?? []) as { id: number; name: string; image: string | null; dept: string; job: string }[]
+      const crew = (movie.crew ?? []) as unknown as { id: number; name: string; image: string | null; dept: string; job: string }[]
       for (const person of crew) {
         const isMatch =
           (type === "directors" && person.job === "Director") ||
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       select: { cast: true },
     })
     for (const episode of episodes) {
-      const cast = (episode.cast ?? []) as CastEntry[]
+      const cast = (episode.cast ?? []) as unknown as CastEntry[]
       for (const person of cast) {
         const isActor = person.gender === 2
         if (type === "actors" && !isActor) continue

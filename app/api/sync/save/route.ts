@@ -38,13 +38,13 @@ export async function POST(req: NextRequest) {
 
   if (dedupedMovies.length) {
     await db.movie.createMany({
-      data: dedupedMovies.map((m) => ({ ...m, userId })),
+      data: dedupedMovies.map((m) => ({ ...m, userId })) as never,
     })
   }
 
   if (shows?.length) {
     await db.tVShow.createMany({
-      data: shows.map((s: object) => ({ ...s, userId })),
+      data: shows.map((s: object) => ({ ...s, userId })) as never,
     })
   }
 
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     const CHUNK = 500
     for (let i = 0; i < dedupedEpisodes.length; i += CHUNK) {
       await db.episode.createMany({
-        data: dedupedEpisodes.slice(i, i + CHUNK).map((e) => ({ ...e, userId })),
+        data: dedupedEpisodes.slice(i, i + CHUNK).map((e) => ({ ...e, userId })) as never,
       })
     }
   }
