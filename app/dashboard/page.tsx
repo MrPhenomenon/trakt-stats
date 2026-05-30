@@ -76,7 +76,8 @@ export default async function DashboardPage() {
   const shows = hasData
     ? await db.tVShow.findMany({ where: { userId }, select: { tmdbId: true, poster: true } })
     : []
-  const showPosterMap = new Map(shows.map((s) => [s.tmdbId, s.poster]))
+  const showPosterMap = new Map<string | null, string | null>()
+  for (const s of shows) showPosterMap.set(s.tmdbId, s.poster)
 
   type RecentItem = { type: "movie" | "episode"; title: string; sub: string; poster: string | null; watchedAt: string; rating: number | null }
   const recentItems: RecentItem[] = []

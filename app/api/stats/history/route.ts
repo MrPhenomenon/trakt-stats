@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
     where: { userId },
     select: { tmdbId: true, poster: true },
   })
-  const posterMap = new Map(shows.map((s) => [s.tmdbId, s.poster]))
+  const posterMap = new Map<string | null, string | null>()
+  for (const s of shows) posterMap.set(s.tmdbId, s.poster)
 
   const showCounts = new Map<string, { count: number; poster: string | null; episodes: string[] }>()
   for (const ep of episodes) {
