@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id         String      @id
+  name       String?
+  image      String?
+  movies     Movie[]
+  tvShows    TVShow[]
+  episodes   Episode[]
+  syncStatus SyncStatus?
+}
+
+model SyncStatus {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSynced DateTime?
+  done       Boolean   @default(false)
+  error      String?
+}
+
+model Movie {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traktId      String
+  tmdbId       String?
+  imdbId       String?
+  title        String
+  plays        Int      @default(1)
+  watchedAt    String[]
+  releasedYear Int?
+  runtime      Int?
+  poster       String?
+  rating       Int?
+  genres       String[]
+  countries    String[]
+  cast         Json?
+  crew         Json?
+  studios      Json?
+
+  @@unique([userId, traktId])
+}
+
+model TVShow {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traktId      String
+  tmdbId       String?
+  title        String
+  episodePlays Int      @default(0)
+  releasedYear Int?
+  poster       String?
+  rating       Int?
+  genres       String[]
+  countries    String[]
+  networks     Json?
+
+  @@unique([userId, traktId])
+}
+
+model Episode {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  traktId      String
+  tmdbId       String?
+  episodeTitle String?
+  showTitle    String
+  season       Int
+  episode      Int
+  plays        Int      @default(1)
+  watchedAt    String[]
+  runtime      Int?
+  tmdbShowId   String?
+  rating       Int?
+  cast         Json?
+  crew         Json?
+
+  @@unique([userId, traktId])
+}
