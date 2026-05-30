@@ -26,14 +26,13 @@ export function NavLinks() {
           <Link
             key={link.href}
             href={link.href}
-            className={`text-sm font-medium transition-colors ${
-              isActive ? "text-white" : "text-zinc-400 hover:text-white"
+            className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+              isActive
+                ? "bg-zinc-800 text-white"
+                : "text-zinc-400 hover:text-white hover:bg-zinc-800/50"
             }`}
           >
             {link.label}
-            {isActive && (
-              <span className="ml-1 inline-block h-1 w-1 rounded-full bg-[#ed1c24] align-middle" />
-            )}
           </Link>
         )
       })}
