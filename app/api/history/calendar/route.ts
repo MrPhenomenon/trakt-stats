@@ -13,38 +13,68 @@ export async function GET(req: NextRequest) {
   const type  = sp.get("type") ?? "all"
 
   const [movies, episodes] = await Promise.all([
-    type !== "tv"
-      ? db.movie.findMany({ where: { userId }, select: { watchedAt: true } })
-      : Promise.resolve([]),
-    type !== "movies"
-      ? db.episode.findMany({ where: { userId }, select: { watchedAt: true } })
-      : Promise.resolve([]),
+    db.movie.findMany({ where: { userId }, select: { watchedAt: true } }),
+    db.episode.findMany({ where: { userId }, select: { watchedAt: true, showTitle: true } }),
   ])
-
-  const allTs = [
-    ...(movies as { watchedAt: string[] }[]).flatMap((m) => m.watchedAt),
-    ...(episodes as { watchedAt: string[] }[]).flatMap((e) => e.watchedAt),
-  ]
 
   const dayCounts: Record<string, number> = {}
   const monthCounts: Record<string, number> = {}
 
-  for (const ts of allTs) {
-    const d = new Date(ts)
-    const y = d.getFullYear()
-    const m = d.getMonth() + 1
+  // monthStats always counts all types regardless of the type filter
+  let statMovies = 0
+  let statEpisodes = 0
+  const statShows = new Set<string>()
 
-    if (y === year) {
-      const mk = String(m)
-      monthCounts[mk] = (monthCounts[mk] ?? 0) + 1
-    }
+  for (const m of movies) {
+    for (const ts of m.watchedAt) {
+      const d = new Date(ts)
+      const y = d.getFullYear()
+      const mo = d.getMonth() + 1
 
-    if (y === year && m === month) {
-      const day = d.getDate()
-      const key = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`
-      dayCounts[key] = (dayCounts[key] ?? 0) + 1
+      if (y === year) {
+        if (type !== "tv") {
+          const mk = String(mo)
+          monthCounts[mk] = (monthCounts[mk] ?? 0) + 1
+        }
+        if (mo === month) {
+          if (type !== "tv") {
+            const key = `${year}-${String(month).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
+            dayCounts[key] = (dayCounts[key] ?? 0) + 1
+          }
+          statMovies++
+        }
+      }
     }
   }
 
-  return NextResponse.json({ dayCounts, monthCounts, year, month })
+  for (const ep of episodes) {
+    for (const ts of ep.watchedAt) {
+      const d = new Date(ts)
+      const y = d.getFullYear()
+      const mo = d.getMonth() + 1
+
+      if (y === year) {
+        if (type !== "movies") {
+          const mk = String(mo)
+          monthCounts[mk] = (monthCounts[mk] ?? 0) + 1
+        }
+        if (mo === month) {
+          if (type !== "movies") {
+            const key = `${year}-${String(month).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
+            dayCounts[key] = (dayCounts[key] ?? 0) + 1
+          }
+          statEpisodes++
+          statShows.add(ep.showTitle)
+        }
+      }
+    }
+  }
+
+  return NextResponse.json({
+    dayCounts,
+    monthCounts,
+    monthStats: { movies: statMovies, shows: statShows.size, episodes: statEpisodes },
+    year,
+    month,
+  })
 }

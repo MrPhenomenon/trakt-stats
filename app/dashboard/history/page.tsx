@@ -8,6 +8,8 @@ const MONTH_NAMES = ["January","February","March","April","May","June",
   "July","August","September","October","November","December"]
 const DAY_LABELS = ["Su","Mo","Tu","We","Th","Fr","Sa"]
 
+interface MonthStats { movies: number; shows: number; episodes: number }
+
 interface CalendarProps {
   type: string
   selectedDate: string | null
@@ -18,21 +20,26 @@ interface CalendarProps {
 
 function CalendarWidget({ type, selectedDate, selectedMonth, onSelectDate, onMonthChange }: CalendarProps) {
   const { year, month } = selectedMonth
-  const [dayCounts, setDayCounts] = useState<Record<string, number>>({})
+  const [dayCounts, setDayCounts]   = useState<Record<string, number>>({})
   const [monthCounts, setMonthCounts] = useState<Record<string, number>>({})
-  const [loadingCal, setLoadingCal] = useState(true)
+  const [monthStats, setMonthStats]  = useState<MonthStats | null>(null)
+  const [loadingCal, setLoadingCal]  = useState(true)
 
   useEffect(() => {
     setLoadingCal(true)
     fetch(`/api/history/calendar?year=${year}&month=${month}&type=${type}`)
       .then((r) => r.json())
-      .then((d) => { setDayCounts(d.dayCounts); setMonthCounts(d.monthCounts) })
+      .then((d) => {
+        setDayCounts(d.dayCounts)
+        setMonthCounts(d.monthCounts)
+        setMonthStats(d.monthStats)
+      })
       .finally(() => setLoadingCal(false))
   }, [year, month, type])
 
-  const firstDay = new Date(year, month - 1, 1).getDay()
+  const firstDay   = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
-  const maxDay = Math.max(...Object.values(dayCounts), 1)
+  const maxDay     = Math.max(...Object.values(dayCounts), 1)
 
   function prev() {
     if (month === 1) onMonthChange(year - 1, 12)
@@ -62,15 +69,12 @@ function CalendarWidget({ type, selectedDate, selectedMonth, onSelectDate, onMon
         {DAY_LABELS.map((d) => (
           <div key={d} className="text-center text-[10px] text-zinc-600 font-medium py-1">{d}</div>
         ))}
-
-        {/* Day cells */}
         {cells.map((day, i) => {
           if (day === null) return <div key={`e-${i}`} />
           const key = `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`
           const count = dayCounts[key] ?? 0
           const isSelected = selectedDate === key
           const intensity = count > 0 ? Math.max(0.15, count / maxDay) : 0
-
           return (
             <button
               key={key}
@@ -79,11 +83,7 @@ function CalendarWidget({ type, selectedDate, selectedMonth, onSelectDate, onMon
                 ${isSelected ? "ring-2 ring-[#ed1c24] ring-offset-1 ring-offset-zinc-950" : ""}
                 ${count > 0 ? "hover:ring-1 hover:ring-zinc-500" : "cursor-default"}
               `}
-              style={{
-                background: count > 0
-                  ? `rgba(237, 28, 36, ${intensity * 0.8})`
-                  : "transparent",
-              }}
+              style={{ background: count > 0 ? `rgba(237, 28, 36, ${intensity * 0.8})` : "transparent" }}
               disabled={count === 0 && !loadingCal}
               title={count > 0 ? `${count} watch${count !== 1 ? "es" : ""}` : undefined}
             >
@@ -93,6 +93,30 @@ function CalendarWidget({ type, selectedDate, selectedMonth, onSelectDate, onMon
           )
         })}
       </div>
+
+      {/* Monthly stats */}
+      {loadingCal ? (
+        <div className="grid grid-cols-3 gap-2">
+          {[0,1,2].map((i) => (
+            <div key={i} className="rounded-lg bg-zinc-800/50 h-12 animate-pulse" />
+          ))}
+        </div>
+      ) : monthStats && (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-lg bg-zinc-800/40 px-2 py-2">
+            <div className="text-base font-bold text-white">{monthStats.movies}</div>
+            <div className="text-[10px] text-zinc-500 leading-tight">Movies</div>
+          </div>
+          <div className="rounded-lg bg-zinc-800/40 px-2 py-2">
+            <div className="text-base font-bold text-white">{monthStats.shows}</div>
+            <div className="text-[10px] text-zinc-500 leading-tight">Shows</div>
+          </div>
+          <div className="rounded-lg bg-zinc-800/40 px-2 py-2">
+            <div className="text-base font-bold text-white">{monthStats.episodes}</div>
+            <div className="text-[10px] text-zinc-500 leading-tight">Episodes</div>
+          </div>
+        </div>
+      )}
 
       {/* Month activity bar */}
       <div className="flex flex-col gap-1">
@@ -126,7 +150,7 @@ function HistoryItemRow({ item }: { item: HistoryItem }) {
   const date = new Date(item.watchedAt)
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-zinc-800/50 last:border-0">
-      <div className="relative w-9 h-13 shrink-0 rounded overflow-hidden bg-zinc-800" style={{height: 52}}>
+      <div className="relative w-9 shrink-0 rounded overflow-hidden bg-zinc-800" style={{height: 52}}>
         {item.poster && (
           <Image src={`https://image.tmdb.org/t/p/w92${item.poster}`} alt={item.title} fill className="object-cover" />
         )}
@@ -153,54 +177,71 @@ function HistoryItemRow({ item }: { item: HistoryItem }) {
   )
 }
 
-interface ApiResponse {
-  items: HistoryItem[]
-  total: number
-  page: number
-  pageSize: number
+interface ApiResponse { items: HistoryItem[]; total: number; page: number; pageSize: number }
+
+function monthRange(year: number, month: number) {
+  const from = `${year}-${String(month).padStart(2,"0")}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const to = `${year}-${String(month).padStart(2,"0")}-${String(lastDay).padStart(2,"0")}`
+  return { from, to }
 }
 
 export default function HistoryPage() {
   const now = new Date()
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate]   = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState({ year: now.getFullYear(), month: now.getMonth() + 1 })
-  const [type, setType] = useState("all")
+  const [allTime, setAllTime] = useState(false)
+  const [type, setType]   = useState("all")
   const [search, setSearch] = useState("")
-  const [page, setPage] = useState(1)
-  const [data, setData] = useState<ApiResponse | null>(null)
+  const [page, setPage]   = useState(1)
+  const [data, setData]   = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(false)
 
   const fetchHistory = useCallback(async (
-    d: string | null, t: string, s: string, p: number
+    d: string | null, sm: { year: number; month: number }, at: boolean, t: string, s: string, p: number
   ) => {
     setLoading(true)
     const params = new URLSearchParams({ type: t, page: p.toString(), limit: "30", sort: "newest" })
-    if (d) { params.set("from", d); params.set("to", d) }
+    if (d) {
+      params.set("from", d)
+      params.set("to", d)
+    } else if (!at) {
+      const { from, to } = monthRange(sm.year, sm.month)
+      params.set("from", from)
+      params.set("to", to)
+    }
     if (s) params.set("search", s)
     const res = await fetch(`/api/history?${params}`)
     setData(await res.json())
     setLoading(false)
   }, [])
 
+  // Fetch whenever any filter or page changes
   useEffect(() => {
-    setPage(1)
-    fetchHistory(selectedDate, type, search, 1)
-  }, [selectedDate, type, search, fetchHistory])
-
-  useEffect(() => {
-    fetchHistory(selectedDate, type, search, page)
-  }, [page, fetchHistory, selectedDate, type, search])
+    fetchHistory(selectedDate, selectedMonth, allTime, type, search, page)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, selectedMonth.year, selectedMonth.month, allTime, type, search, page])
 
   function handleMonthChange(year: number, month: number) {
     setSelectedMonth({ year, month })
     setSelectedDate(null)
+    setAllTime(false)
+    setPage(1)
+  }
+
+  function handleDateSelect(d: string | null) {
+    setSelectedDate(d)
+    setAllTime(false)
+    setPage(1)
   }
 
   const totalPages = data ? Math.ceil(data.total / 30) : 0
 
   const dateLabel = selectedDate
     ? new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
-    : null
+    : allTime
+    ? "All time"
+    : `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}`
 
   return (
     <div className="flex flex-col gap-6">
@@ -208,7 +249,7 @@ export default function HistoryPage() {
         <h1 className="text-2xl font-bold">History</h1>
         {data && (
           <span className="text-sm text-zinc-500">
-            {selectedDate ? `${data.total} watches on this day` : `${data.total.toLocaleString()} total watch events`}
+            {data.total.toLocaleString()} {selectedDate ? "watches on this day" : allTime ? "total watches" : "watches this month"}
           </span>
         )}
       </div>
@@ -220,11 +261,30 @@ export default function HistoryPage() {
             type={type}
             selectedDate={selectedDate}
             selectedMonth={selectedMonth}
-            onSelectDate={(d) => { setSelectedDate(d); setPage(1) }}
+            onSelectDate={handleDateSelect}
             onMonthChange={handleMonthChange}
           />
 
           <div className="border-t border-zinc-800 pt-4 flex flex-col gap-3">
+            {/* Period toggle */}
+            <div>
+              <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Period</p>
+              <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+                <button
+                  onClick={() => { setAllTime(false); setSelectedDate(null); setPage(1) }}
+                  className={`flex-1 py-1.5 text-xs font-medium transition ${!allTime ? "bg-[#ed1c24] text-white" : "text-zinc-400 hover:text-white"}`}
+                >
+                  Month
+                </button>
+                <button
+                  onClick={() => { setAllTime(true); setSelectedDate(null); setPage(1) }}
+                  className={`flex-1 py-1.5 text-xs font-medium transition ${allTime ? "bg-[#ed1c24] text-white" : "text-zinc-400 hover:text-white"}`}
+                >
+                  All time
+                </button>
+              </div>
+            </div>
+
             {/* Type toggle */}
             <div>
               <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Type</p>
@@ -253,9 +313,9 @@ export default function HistoryPage() {
               />
             </div>
 
-            {(selectedDate || type !== "all" || search) && (
+            {(selectedDate || allTime || type !== "all" || search) && (
               <button
-                onClick={() => { setSelectedDate(null); setType("all"); setSearch(""); setPage(1) }}
+                onClick={() => { setSelectedDate(null); setAllTime(false); setType("all"); setSearch(""); setPage(1) }}
                 className="text-xs text-zinc-600 hover:text-white transition underline text-left"
               >
                 Clear all filters
@@ -266,13 +326,12 @@ export default function HistoryPage() {
 
         {/* ── History list ── */}
         <div className="flex-1 min-w-0 flex flex-col gap-4">
-          {dateLabel && (
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-zinc-800" />
-              <span className="text-xs text-zinc-400 px-3 shrink-0">{dateLabel}</span>
-              <div className="h-px flex-1 bg-zinc-800" />
-            </div>
-          )}
+          {/* Date / month label */}
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-zinc-800" />
+            <span className="text-xs text-zinc-400 px-3 shrink-0">{dateLabel}</span>
+            <div className="h-px flex-1 bg-zinc-800" />
+          </div>
 
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 min-h-32">
             {loading && (
@@ -283,7 +342,7 @@ export default function HistoryPage() {
             )}
             {!loading && data?.items.length === 0 && (
               <div className="py-10 text-center text-zinc-600 text-sm">
-                {selectedDate ? "Nothing watched on this day" : "No results"}
+                {selectedDate ? "Nothing watched on this day" : allTime ? "No results" : "Nothing watched this month"}
               </div>
             )}
             {!loading && data?.items.map((item, i) => (

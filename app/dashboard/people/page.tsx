@@ -1,9 +1,7 @@
 import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import Image from "next/image"
 import { db } from "@/lib/db"
-
-type PersonEntry = { id: number; name: string; image: string | null; gender: number; count: number }
+import { PeopleGrid, type PersonEntry } from "./people-grid"
 
 function aggregateByRuns(
   movies: { cast?: unknown; crew?: unknown }[],
@@ -21,12 +19,10 @@ function aggregateByRuns(
     else counts.set(id, { id, name: p.name as string, image: p.image as string | null, gender: (p.gender as number) ?? 0, count: 1 })
   }
 
-  // Each movie = 1 run
   for (const movie of movies) {
     for (const p of (movie[field] ?? []) as Record<string, unknown>[]) bump(p)
   }
 
-  // Each unique show = 1 run (deduplicate across episodes within the same show)
   for (const episodes of showGroups.values()) {
     const seenInShow = new Set<number>()
     for (const ep of episodes) {
@@ -44,32 +40,6 @@ function aggregateByRuns(
   return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 20)
 }
 
-function PeopleGrid({ people, label }: { people: PersonEntry[]; label: string }) {
-  return (
-    <section>
-      <h2 className="text-lg font-semibold mb-4">{label}</h2>
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-10">
-        {people.map((p) => (
-          <div key={p.id} className="flex flex-col gap-1 items-center text-center">
-            <div className="relative w-16 h-16 rounded-full overflow-hidden bg-zinc-800 shrink-0">
-              {p.image && (
-                <Image
-                  src={`https://image.tmdb.org/t/p/w185${p.image}`}
-                  alt={p.name}
-                  fill
-                  className="object-cover"
-                />
-              )}
-            </div>
-            <span className="text-xs text-zinc-300 leading-tight">{p.name}</span>
-            <span className="text-xs text-zinc-600">{p.count} title{p.count !== 1 ? "s" : ""}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
 export default async function PeoplePage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/")
@@ -81,7 +51,6 @@ export default async function PeoplePage() {
     db.movie.findMany({ where: { userId }, select: { cast: true, crew: true } }),
   ])
 
-  // Group episodes by show — prefer tmdbShowId, fall back to showTitle
   const showGroups = new Map<string, typeof episodes>()
   for (const ep of episodes) {
     const key = ep.tmdbShowId ?? ep.showTitle
