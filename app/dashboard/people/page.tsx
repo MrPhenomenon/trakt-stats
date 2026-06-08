@@ -5,22 +5,42 @@ import { db } from "@/lib/db"
 
 type PersonEntry = { id: number; name: string; image: string | null; gender: number; count: number }
 
-function aggregatePeople(
-  items: { cast?: unknown; crew?: unknown }[],
+function aggregateByRuns(
+  movies: { cast?: unknown; crew?: unknown }[],
+  showGroups: Map<string, { cast?: unknown; crew?: unknown }[]>,
   field: "cast" | "crew",
   filter: (p: Record<string, unknown>) => boolean
 ): PersonEntry[] {
   const counts = new Map<number, PersonEntry>()
-  for (const item of items) {
-    const people = (item[field] ?? []) as Record<string, unknown>[]
-    for (const p of people) {
-      if (!filter(p)) continue
-      const id = p.id as number
-      const existing = counts.get(id)
-      if (existing) existing.count++
-      else counts.set(id, { id, name: p.name as string, image: p.image as string | null, gender: (p.gender as number) ?? 0, count: 1 })
+
+  const bump = (p: Record<string, unknown>) => {
+    if (!filter(p)) return
+    const id = p.id as number
+    const existing = counts.get(id)
+    if (existing) existing.count++
+    else counts.set(id, { id, name: p.name as string, image: p.image as string | null, gender: (p.gender as number) ?? 0, count: 1 })
+  }
+
+  // Each movie = 1 run
+  for (const movie of movies) {
+    for (const p of (movie[field] ?? []) as Record<string, unknown>[]) bump(p)
+  }
+
+  // Each unique show = 1 run (deduplicate across episodes within the same show)
+  for (const episodes of showGroups.values()) {
+    const seenInShow = new Set<number>()
+    for (const ep of episodes) {
+      for (const p of (ep[field] ?? []) as Record<string, unknown>[]) {
+        if (!filter(p)) continue
+        const id = p.id as number
+        if (!seenInShow.has(id)) {
+          seenInShow.add(id)
+          bump(p)
+        }
+      }
     }
   }
+
   return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 20)
 }
 
@@ -42,7 +62,7 @@ function PeopleGrid({ people, label }: { people: PersonEntry[]; label: string })
               )}
             </div>
             <span className="text-xs text-zinc-300 leading-tight">{p.name}</span>
-            <span className="text-xs text-zinc-600">{p.count} eps</span>
+            <span className="text-xs text-zinc-600">{p.count} title{p.count !== 1 ? "s" : ""}</span>
           </div>
         ))}
       </div>
@@ -57,22 +77,30 @@ export default async function PeoplePage() {
   const userId = session.user.id
 
   const [episodes, movies] = await Promise.all([
-    db.episode.findMany({ where: { userId }, select: { cast: true, crew: true } }),
+    db.episode.findMany({ where: { userId }, select: { tmdbShowId: true, showTitle: true, cast: true, crew: true } }),
     db.movie.findMany({ where: { userId }, select: { cast: true, crew: true } }),
   ])
 
-  const actors = aggregatePeople(episodes, "cast", (p) => p.gender === 2)
-  const actresses = aggregatePeople(episodes, "cast", (p) => p.gender === 1)
-  const directors = aggregatePeople(movies, "crew", (p) => p.job === "Director")
-  const writers = aggregatePeople(movies, "crew", (p) => p.dept === "Writing")
+  // Group episodes by show — prefer tmdbShowId, fall back to showTitle
+  const showGroups = new Map<string, typeof episodes>()
+  for (const ep of episodes) {
+    const key = ep.tmdbShowId ?? ep.showTitle
+    if (!showGroups.has(key)) showGroups.set(key, [])
+    showGroups.get(key)!.push(ep)
+  }
+
+  const actors    = aggregateByRuns(movies, showGroups, "cast", (p) => p.gender === 2)
+  const actresses = aggregateByRuns(movies, showGroups, "cast", (p) => p.gender === 1)
+  const directors = aggregateByRuns(movies, showGroups, "crew", (p) => p.job === "Director")
+  const writers   = aggregateByRuns(movies, showGroups, "crew", (p) => p.dept === "Writing")
 
   return (
     <div className="flex flex-col gap-10">
       <h1 className="text-2xl font-bold">People</h1>
-      <PeopleGrid people={actors} label="Most Watched Actors" />
+      <PeopleGrid people={actors}    label="Most Watched Actors" />
       <PeopleGrid people={actresses} label="Most Watched Actresses" />
       <PeopleGrid people={directors} label="Most Watched Directors" />
-      <PeopleGrid people={writers} label="Most Watched Writers" />
+      <PeopleGrid people={writers}   label="Most Watched Writers" />
     </div>
   )
 }
