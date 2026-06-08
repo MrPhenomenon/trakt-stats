@@ -37,6 +37,9 @@ export default async function LoginPage() {
       <p className="text-xs text-zinc-600">
         We only read your watch history. Nothing is posted or modified.
       </p>
+      <p className="text-xs text-zinc-700 text-center max-w-xs">
+        Make sure you&apos;re logged into <a href="https://trakt.tv" target="_blank" className="underline hover:text-zinc-500">trakt.tv</a> first.
+      </p>
     </div>
   )
 }

@@ -5,6 +5,31 @@ import { useRouter } from "next/navigation"
 
 type Phase = "idle" | "movies" | "tv" | "episodes" | "saving" | "updating" | "done" | "error"
 
+const SAVE_BATCH = 300
+
+function mergeByTraktId<T extends { traktId: string; plays: number; watchedAt: string[] }>(items: T[]): T[] {
+  const map = new Map<string, T>()
+  for (const item of items) {
+    if (map.has(item.traktId)) {
+      const existing = map.get(item.traktId)!
+      existing.plays += item.plays
+      existing.watchedAt = [...existing.watchedAt, ...item.watchedAt]
+    } else {
+      map.set(item.traktId, { ...item })
+    }
+  }
+  return [...map.values()]
+}
+
+async function savePhase(phase: string, items?: object[]) {
+  const res = await fetch("/api/sync/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(items !== undefined ? { phase, items } : { phase }),
+  })
+  if (!res.ok) throw new Error(`Save ${phase} failed: ${res.status}`)
+}
+
 interface Props {
   lastSynced: string | null
   compact: boolean
@@ -65,12 +90,21 @@ export default function SyncPanel({ lastSynced, compact }: Props) {
       })
 
       setPhase("saving")
-      const saveRes = await fetch("/api/sync/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ movies: allMovies, shows: allShows, episodes: allEpisodes }),
-      })
-      if (!saveRes.ok) throw new Error("Save failed")
+
+      const mergedMovies = mergeByTraktId(allMovies as never[])
+      const mergedEpisodes = mergeByTraktId(allEpisodes as never[])
+
+      await savePhase("clear")
+
+      for (let i = 0; i < mergedMovies.length; i += SAVE_BATCH)
+        await savePhase("movies", mergedMovies.slice(i, i + SAVE_BATCH))
+
+      await savePhase("shows", allShows)
+
+      for (let i = 0; i < mergedEpisodes.length; i += SAVE_BATCH)
+        await savePhase("episodes", mergedEpisodes.slice(i, i + SAVE_BATCH))
+
+      await savePhase("finalize")
 
       setPhase("done")
       router.refresh()
