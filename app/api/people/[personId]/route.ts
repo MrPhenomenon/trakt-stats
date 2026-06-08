@@ -4,13 +4,14 @@ import { db } from "@/lib/db"
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { personId: string } }
+  { params }: { params: Promise<{ personId: string }> }
 ) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const userId = session.user.id
-  const personId = parseInt(params.personId)
+  const { personId: personIdStr } = await params
+  const personId = parseInt(personIdStr)
   if (isNaN(personId)) return NextResponse.json({ error: "Invalid" }, { status: 400 })
 
   type MovieRow = { title: string; year: number | null; poster: string | null; watchedAt: string[]; plays: number }
