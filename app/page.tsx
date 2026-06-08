@@ -2,7 +2,7 @@ import { auth, signIn } from "@/lib/auth"
 import { redirect } from "next/navigation"
 export default async function LoginPage() {
   const session = await auth()
-  if (session?.user) redirect("/dashboard")
+  if (session?.user && !session.error) redirect("/dashboard")
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-4">
