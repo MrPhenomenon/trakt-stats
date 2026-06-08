@@ -20,7 +20,7 @@ export async function GET(
     FROM "Movie"
     WHERE "userId" = ${userId}
     AND (
-      (cast IS NOT NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements(cast) e WHERE (e->>'id')::int = ${personId}))
+      ("cast" IS NOT NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements("cast") e WHERE (e->>'id')::int = ${personId}))
       OR
       (crew IS NOT NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements(crew) e WHERE (e->>'id')::int = ${personId}))
     )
@@ -34,7 +34,7 @@ export async function GET(
     LEFT JOIN "TVShow" t ON t."tmdbId" = e."tmdbShowId" AND t."userId" = e."userId"
     WHERE e."userId" = ${userId}
     AND (
-      (e.cast IS NOT NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements(e.cast) el WHERE (el->>'id')::int = ${personId}))
+      (e."cast" IS NOT NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements(e."cast") el WHERE (el->>'id')::int = ${personId}))
       OR
       (e.crew IS NOT NULL AND EXISTS (SELECT 1 FROM jsonb_array_elements(e.crew) el WHERE (el->>'id')::int = ${personId}))
     )
