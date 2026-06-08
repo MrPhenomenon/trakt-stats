@@ -6,6 +6,7 @@ import { NavLinks } from "@/components/nav-links"
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session?.user) redirect("/")
+  if (session.error === "RefreshAccessTokenError") redirect("/")
 
   return (
     <div className="flex min-h-screen flex-col">

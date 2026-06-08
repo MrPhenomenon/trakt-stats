@@ -18,6 +18,7 @@ async function traktFetch(url: string, accessToken: string) {
   const res = await fetch(`https://api.trakt.tv${url}`, {
     headers: { ...TRAKT_HEADERS(), Authorization: `Bearer ${accessToken}` },
   })
+  if (res.status === 401) throw new Error("Trakt token expired or invalid")
   return res.ok ? res.json() : []
 }
 
@@ -25,6 +26,7 @@ async function traktTotal(url: string, accessToken: string): Promise<number> {
   const res = await fetch(`https://api.trakt.tv${url}`, {
     headers: { ...TRAKT_HEADERS(), Authorization: `Bearer ${accessToken}` },
   })
+  if (res.status === 401) throw new Error("Trakt token expired or invalid")
   return parseInt(res.headers.get("X-Pagination-Item-Count") ?? "0")
 }
 
