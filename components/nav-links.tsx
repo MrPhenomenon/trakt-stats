@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/dashboard/tv",      label: "TV Shows" },
   { href: "/dashboard/people",  label: "People" },
   { href: "/dashboard/history", label: "History" },
+  { href: "/dashboard/sync",    label: "Sync" },
 ]
 
 export function NavLinks() {

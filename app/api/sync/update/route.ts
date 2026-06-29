@@ -63,42 +63,89 @@ export async function POST(req: NextRequest) {
   const needEpisodeDeleteCheck = (dbEpisodeAgg._sum.plays ?? 0) > traktEpisodePlays
 
   if (needMovieDeleteCheck) {
-    const traktMovieIds = new Set<string>()
+    const traktMovieTimestamps = new Map<string, string[]>()
     let p = 1
     while (true) {
       const items = await traktFetch(`/users/${username}/history/movies?page=${p}&limit=100`, accessToken)
       if (!items.length) break
-      for (const item of items) if (item.movie) traktMovieIds.add(String(item.movie.ids.trakt))
+      for (const item of items) {
+        if (item.movie) {
+          const id = String(item.movie.ids.trakt)
+          if (!traktMovieTimestamps.has(id)) traktMovieTimestamps.set(id, [])
+          traktMovieTimestamps.get(id)!.push(item.watched_at)
+        }
+      }
       p++
     }
-    const dbMovies = await db.movie.findMany({ where: { userId }, select: { id: true, traktId: true, title: true } }) as { id: string; traktId: string; title: string }[]
-    const orphans = dbMovies.filter((m) => !traktMovieIds.has(m.traktId))
+    const dbMovies = await db.movie.findMany({
+      where: { userId },
+      select: { id: true, traktId: true, title: true, plays: true, watchedAt: true },
+    }) as { id: string; traktId: string; title: string; plays: number; watchedAt: string[] }[]
+
+    // Movies completely removed from Trakt
+    const orphans = dbMovies.filter((m) => !traktMovieTimestamps.has(m.traktId))
     if (orphans.length) {
       await db.movie.deleteMany({ where: { id: { in: orphans.map((m) => m.id) } } })
       summary.deletedMovies.push(...orphans.map((m) => m.title))
     }
+
+    // Movies with fewer plays on Trakt than in DB (deleted history entries)
+    const overcounted = dbMovies.filter((m) => {
+      const traktTs = traktMovieTimestamps.get(m.traktId)
+      return traktTs !== undefined && traktTs.length < m.plays
+    })
+    await Promise.all(overcounted.map((movie) => {
+      const traktTs = traktMovieTimestamps.get(movie.traktId)!
+      summary.deletedMovies.push(movie.title)
+      return db.movie.update({
+        where: { id: movie.id },
+        data: { plays: traktTs.length, watchedAt: traktTs },
+      })
+    }))
   }
 
   if (needEpisodeDeleteCheck) {
-    const traktEpisodeIds = new Set<string>()
+    const traktEpisodeTimestamps = new Map<string, string[]>()
     let p = 1
     while (true) {
       const items = await traktFetch(`/users/${username}/history/episodes?page=${p}&limit=100`, accessToken)
       if (!items.length) break
-      for (const item of items) if (item.episode) traktEpisodeIds.add(String(item.episode.ids.trakt))
+      for (const item of items) {
+        if (item.episode) {
+          const id = String(item.episode.ids.trakt)
+          if (!traktEpisodeTimestamps.has(id)) traktEpisodeTimestamps.set(id, [])
+          traktEpisodeTimestamps.get(id)!.push(item.watched_at)
+        }
+      }
       p++
     }
     const dbEpisodes = await db.episode.findMany({
       where: { userId },
-      select: { id: true, traktId: true, showTitle: true, season: true, episode: true },
-    }) as { id: string; traktId: string; showTitle: string; season: number; episode: number }[]
-    const orphans = dbEpisodes.filter((e) => !traktEpisodeIds.has(e.traktId))
+      select: { id: true, traktId: true, showTitle: true, season: true, episode: true, plays: true, watchedAt: true },
+    }) as { id: string; traktId: string; showTitle: string; season: number; episode: number; plays: number; watchedAt: string[] }[]
+
+    // Episodes completely removed from Trakt
+    const orphans = dbEpisodes.filter((e) => !traktEpisodeTimestamps.has(e.traktId))
     if (orphans.length) {
       await db.episode.deleteMany({ where: { id: { in: orphans.map((e) => e.id) } } })
       summary.deletedEpisodes.push(
         ...orphans.map((e) => `${e.showTitle} S${String(e.season).padStart(2,"0")}E${String(e.episode).padStart(2,"0")}`)
       )
     }
+
+    // Episodes with fewer plays on Trakt than in DB (deleted history entries)
+    const overcounted = dbEpisodes.filter((e) => {
+      const traktTs = traktEpisodeTimestamps.get(e.traktId)
+      return traktTs !== undefined && traktTs.length < e.plays
+    })
+    await Promise.all(overcounted.map((ep) => {
+      const traktTs = traktEpisodeTimestamps.get(ep.traktId)!
+      summary.deletedEpisodes.push(`${ep.showTitle} S${String(ep.season).padStart(2,"0")}E${String(ep.episode).padStart(2,"0")}`)
+      return db.episode.update({
+        where: { id: ep.id },
+        data: { plays: traktTs.length, watchedAt: traktTs },
+      })
+    }))
   }
 
   const existingMovieIds = new Set(

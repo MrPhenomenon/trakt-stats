@@ -55,6 +55,24 @@ export async function getRatings(username: string, accessToken: string) {
   return traktGet<TraktRating[]>(`/users/${username}/ratings`, accessToken)
 }
 
+export async function getItemHistoryPage(
+  username: string,
+  accessToken: string,
+  type: "movies" | "shows",
+  traktId: string,
+  page: number,
+  limit = 100
+): Promise<TraktHistoryItem[]> {
+  try {
+    return await traktGet<TraktHistoryItem[]>(
+      `/users/${username}/history/${type}/${traktId}?page=${page}&limit=${limit}`,
+      accessToken
+    )
+  } catch {
+    return []
+  }
+}
+
 export async function getList(listSlug: string, accessToken: string) {
   try {
     return await traktGet<TraktListItem[]>(`/lists/${listSlug}/items`, accessToken)

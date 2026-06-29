@@ -87,8 +87,18 @@ export async function GET(req: NextRequest) {
   }
 
   events.sort((a, b) => {
-    const diff = new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
-    return sort === "oldest" ? -diff : diff
+    const timeDiff = new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+    const primary = sort === "oldest" ? -timeDiff : timeDiff
+    if (primary !== 0) return primary
+
+    // Tiebreak: episodes of the same show sort by season then episode number
+    if (a.type === "episode" && b.type === "episode" && a.showTitle === b.showTitle) {
+      const sd = (a.season ?? 0) - (b.season ?? 0)
+      if (sd !== 0) return sort === "oldest" ? sd : -sd
+      const ed = (a.episode ?? 0) - (b.episode ?? 0)
+      return sort === "oldest" ? ed : -ed
+    }
+    return 0
   })
 
   const total = events.length
