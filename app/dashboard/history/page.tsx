@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import type { HistoryItem } from "@/app/api/history/route"
 
@@ -18,24 +18,31 @@ interface CalendarProps {
   onMonthChange: (year: number, month: number) => void
 }
 
+interface CalData {
+  dayCounts: Record<string, number>
+  monthCounts: Record<string, number>
+  monthStats: MonthStats | null
+  year: number
+  month: number
+}
+
 function CalendarWidget({ type, selectedDate, selectedMonth, onSelectDate, onMonthChange }: CalendarProps) {
   const { year, month } = selectedMonth
-  const [dayCounts, setDayCounts]   = useState<Record<string, number>>({})
-  const [monthCounts, setMonthCounts] = useState<Record<string, number>>({})
-  const [monthStats, setMonthStats]  = useState<MonthStats | null>(null)
-  const [loadingCal, setLoadingCal]  = useState(true)
+  const [calData, setCalData] = useState<CalData | null>(null)
 
   useEffect(() => {
-    setLoadingCal(true)
+    let active = true
     fetch(`/api/history/calendar?year=${year}&month=${month}&type=${type}`)
       .then((r) => r.json())
-      .then((d) => {
-        setDayCounts(d.dayCounts)
-        setMonthCounts(d.monthCounts)
-        setMonthStats(d.monthStats)
-      })
-      .finally(() => setLoadingCal(false))
+      .then((d) => { if (active) setCalData({ ...d, year, month }) })
+    return () => { active = false }
   }, [year, month, type])
+
+  // Derived — loading when no data or data is stale (different month/year)
+  const loadingCal = !calData || calData.year !== year || calData.month !== month
+  const dayCounts   = loadingCal ? {} : calData.dayCounts
+  const monthCounts = loadingCal ? {} : calData.monthCounts
+  const monthStats  = loadingCal ? null : calData.monthStats
 
   const firstDay   = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -168,7 +175,10 @@ function HistoryItemRow({ item }: { item: HistoryItem }) {
         <p className="text-sm text-white truncate leading-tight">{item.title}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-zinc-500">
+          {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+        </p>
+        <p className="text-xs text-zinc-700">
           {date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
         </p>
         {item.runtime && <p className="text-[10px] text-zinc-700">{item.runtime}m</p>}
@@ -194,33 +204,32 @@ export default function HistoryPage() {
   const [type, setType]   = useState("all")
   const [search, setSearch] = useState("")
   const [page, setPage]   = useState(1)
-  const [data, setData]   = useState<ApiResponse | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<{ key: string; resp: ApiResponse } | null>(null)
 
-  const fetchHistory = useCallback(async (
-    d: string | null, sm: { year: number; month: number }, at: boolean, t: string, s: string, p: number
-  ) => {
-    setLoading(true)
-    const params = new URLSearchParams({ type: t, page: p.toString(), limit: "30", sort: "newest" })
-    if (d) {
-      params.set("from", d)
-      params.set("to", d)
-    } else if (!at) {
-      const { from, to } = monthRange(sm.year, sm.month)
+  // Encode all filter params into a single key — effect runs when this changes
+  const fetchKey = `${selectedDate ?? ""}|${selectedMonth.year}|${selectedMonth.month}|${allTime}|${type}|${search}|${page}`
+
+  // Derived: loading whenever the cached result doesn't match current params
+  const loading = !result || result.key !== fetchKey
+  const data = result?.resp ?? null
+
+  useEffect(() => {
+    let active = true
+    const params = new URLSearchParams({ type, page: page.toString(), limit: "30", sort: "newest" })
+    if (selectedDate) {
+      params.set("from", selectedDate)
+      params.set("to", selectedDate)
+    } else if (!allTime) {
+      const { from, to } = monthRange(selectedMonth.year, selectedMonth.month)
       params.set("from", from)
       params.set("to", to)
     }
-    if (s) params.set("search", s)
-    const res = await fetch(`/api/history?${params}`)
-    setData(await res.json())
-    setLoading(false)
-  }, [])
-
-  // Fetch whenever any filter or page changes
-  useEffect(() => {
-    fetchHistory(selectedDate, selectedMonth, allTime, type, search, page)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, selectedMonth.year, selectedMonth.month, allTime, type, search, page])
+    if (search) params.set("search", search)
+    fetch(`/api/history?${params}`)
+      .then((r) => r.json())
+      .then((resp) => { if (active) setResult({ key: fetchKey, resp }) })
+    return () => { active = false }
+  }, [fetchKey])
 
   function handleMonthChange(year: number, month: number) {
     setSelectedMonth({ year, month })

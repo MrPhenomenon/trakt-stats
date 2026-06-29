@@ -5,6 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { db } from "@/lib/db"
 import SyncPanel from "./sync-panel"
+import { LocalDate } from "@/components/local-date"
 
 function ProfileBanner({ session }: { session: Session | null }) {
   if (!session?.user) return null
@@ -148,29 +149,20 @@ export default async function DashboardPage() {
               </div>
 
               <div className="rounded-xl border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
-                {recent10.map((item, i) => {
-                  const date = new Date(item.watchedAt)
-                  const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  const timeStr = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-                  return (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3">
-                      <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-zinc-800">
-                        {item.poster && (
-                          <Image src={`https://image.tmdb.org/t/p/w92${item.poster}`} alt={item.title} fill className="object-cover" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white truncate font-medium">{item.title}</p>
-                        <p className="text-xs text-zinc-500 truncate">{item.sub}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        {item.rating && <p className="text-xs text-[#ed1c24] font-bold mb-0.5">★ {item.rating}</p>}
-                        <p className="text-xs text-zinc-500">{dateStr}</p>
-                        <p className="text-xs text-zinc-700">{timeStr}</p>
-                      </div>
+                {recent10.map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3">
+                    <div className="relative w-8 h-11 shrink-0 rounded overflow-hidden bg-zinc-800">
+                      {item.poster && (
+                        <Image src={`https://image.tmdb.org/t/p/w92${item.poster}`} alt={item.title} fill className="object-cover" />
+                      )}
                     </div>
-                  )
-                })}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate font-medium">{item.title}</p>
+                      <p className="text-xs text-zinc-500 truncate">{item.sub}</p>
+                    </div>
+                    <LocalDate watchedAt={item.watchedAt} rating={item.rating} />
+                  </div>
+                ))}
               </div>
             </div>
           )}
